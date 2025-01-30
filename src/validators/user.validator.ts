@@ -10,7 +10,7 @@ export const createUserSchema = z.object({
   email: z.string().email().optional().nullable(), // Accepts both null & undefined
   address: z.string().min(1).optional().nullable(),
   employmentType: z.enum(["EMPLOYED", "BUSINESS"]),
-  salary: z.number().optional().nullable(), // Accepts both null & undefined
+  income: z.number().optional().nullable(), // Accepts both null & undefined
   businessIncome: z.number().optional().nullable(),
 });
 

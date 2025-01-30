@@ -13,7 +13,7 @@ interface User {
   dob: Date;
   address: string | null;
   employmentType: "EMPLOYED" | "BUSINESS";
-  salary: number | null;
+  income: number | null;
   businessIncome: number | null;
 }
 
@@ -35,24 +35,22 @@ interface UserWithFinancials {
   loans: Loan[];
 }
 
-export const getAllUsers = asyncHandler(
-  async (req: Request, res: Response) => {
-    const users = await prisma.user.findMany({
-      include: {
-        accounts: true,
-        loans: true,
-        investments: true,
-      },
-    });
+export const getAllUsers = asyncHandler(async (req: Request, res: Response) => {
+  const users = await prisma.user.findMany({
+    include: {
+      accounts: true,
+      loans: true,
+      investments: true,
+    },
+  });
 
-    const usersWithNetWorth = users.map((user) => ({
-      ...user,
-      netWorth: calculateNetWorth(user as UserWithFinancials),
-    }));
+  const usersWithNetWorth = users.map((user) => ({
+    ...user,
+    netWorth: calculateNetWorth(user as UserWithFinancials),
+  }));
 
-    res.status(200).json(resp.success(usersWithNetWorth, "Users found"));
-  }
-);
+  res.status(200).json(resp.success(usersWithNetWorth, "Users found"));
+});
 
 export const getUserByPAN = asyncHandler(
   async (req: Request, res: Response) => {
@@ -96,7 +94,7 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
   const user = await prisma.user.create({
     data: {
       ...validatedData,
-      salary: validatedData.salary || null,
+      income: validatedData.income || null,
       businessIncome: validatedData.businessIncome || null,
     },
   });
@@ -117,4 +115,3 @@ function calculateNetWorth(user: UserWithFinancials): number {
   );
   return assets - liabilities;
 }
-

@@ -65,7 +65,7 @@ export const earn = asyncHandler(async (req: Request, res: Response) => {
   res.status(HttpStatus.OK).json(resp.success("Transaction successful"));
 });
 
-export const salaryCycle = asyncHandler(async (req: Request, res: Response) => {
+export const incomeCycle = asyncHandler(async (req: Request, res: Response) => {
   const users = await prisma.user.findMany({
     include: {
       accounts: true,
@@ -79,79 +79,74 @@ export const salaryCycle = asyncHandler(async (req: Request, res: Response) => {
   for (const user of users) {
     if (!user.accounts || user.accounts.length === 0) continue;
     const account = user.accounts[0];
-    
+
+    const incomeAmount =
+      user.employmentType === "EMPLOYED" ? user.income || 0 : 0;
+
+    if (incomeAmount > 0) {
+      await prisma.bankAccount.update({
+        where: {
+          id: account.id,
+        },
+        data: {
+          balance: {
+            increment: incomeAmount,
+          },
+        },
+      });
+    }
+  }
+  res.status(HttpStatus.OK).json(resp.success("income cycle successful"));
+});
+
+//repay loan emi
+export const loanEMI = asyncHandler(async (req: Request, res: Response) => {
+  const users = await prisma.user.findMany({
+    include: {
+      accounts: true,
+      loans: true,
+    },
+  });
+
+  if (!users || users.length === 0) {
+    throw new ApiError(HttpStatus.NOT_FOUND, "Users not found");
+  }
+
+  for (const user of users) {
+    if (!user.accounts || user.accounts.length === 0) continue;
+    const account = user.accounts[0];
+
+    if (!user.loans || user.loans.length === 0) continue;
+    const loan = user.loans[0];
+
+    if (account.balance < loan.emi) {
+      loan.emi = account.balance;
+    }
+
     await prisma.bankAccount.update({
       where: {
         id: account.id,
       },
       data: {
         balance: {
-          increment: user.employmentType === "EMPLOYED" ? user.salary! : 0,
+          decrement: loan.emi,
+        },
+      },
+    });
+
+    await prisma.loan.update({
+      where: {
+        id: loan.id,
+      },
+      data: {
+        remainingAmount: {
+          decrement: loan.emi,
         },
       },
     });
   }
 
-  res.status(HttpStatus.OK).json(resp.success("Salary cycle successful"));
-});
-
-//repay loan emi
-export const loanEMI = asyncHandler(async (req: Request, res: Response) => {
-  const { userId } = req.params;
-  if (!userId) {
-    throw new ApiError(HttpStatus.BAD_REQUEST, "Missing required fields");
-  }
-
-  //get the loan emi amounts for the user
-  const loans = await prisma.loan.findMany({
-    where: {
-      userId: userId as string,
-    },
-  });
-
-  // sum the emi
-  let totalEMI = 0;
-  loans.forEach((loan) => {
-    totalEMI += loan.emi;
-  });
-
-  //get the user account
-  const user = await prisma.user.findUnique({
-    where: {
-      id: userId as string,
-    },
-    include: {
-      accounts: true,
-    },
-  });
-
-  if (!user || user.accounts.length === 0) {
-    throw new ApiError(HttpStatus.NOT_FOUND, "User or user accounts not found");
-  }
-
-  //check if the user has enough balance to repay the loan emi
-  if (user.accounts[0].balance < totalEMI) {
-    throw new ApiError(
-      HttpStatus.BAD_REQUEST,
-      "Insufficient balance to repay loan emi"
-    );
-  }
-
-  //repay the loan emi
-  const account = await prisma.bankAccount.update({
-    where: {
-      id: user.accounts[0].id,
-    },
-    data: {
-      balance: {
-        decrement: totalEMI,
-      },
-    },
-  });
-
-  res
-    .status(HttpStatus.OK)
-    .json(resp.success(`Loan EMI of ${user.name} repaid successfully`));
+  res.status(HttpStatus.OK).json(resp.success("Loan EMI repayment successful"));
 });
 
 export const simulate = asyncHandler(async (req: Request, res: Response) => {
@@ -165,62 +160,101 @@ export const simulate = asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(HttpStatus.NOT_FOUND, "Users not found");
   }
 
-  // First simulation phase
+  // Emergency fund addition for very low balances
   for (const user of users) {
     if (!user.accounts || user.accounts.length === 0) continue;
     const account = user.accounts[0];
-    
-    if (account.balance < 1000) {
+
+    if (account.balance < 500) {
+      const emergencyAmount = Math.floor(Math.random() * (5000 - 2000) + 2000);
       await prisma.bankAccount.update({
-        where: {
-          id: account.id,
-        },
-        data: {
-          balance: {
-            increment: 10000,
-          },
-        },
+        where: { id: account.id },
+        data: { balance: { increment: emergencyAmount } },
       });
     }
   }
 
-  // Second simulation phase
-  for (const user of users) {
-    if (!user.accounts || user.accounts.length === 0) continue;
-    const account = user.accounts[0];
-    
-    if (account.balance > 10000) {
-      await prisma.bankAccount.update({
-        where: {
-          id: account.id,
-        },
-        data: {
-          balance: {
-            decrement: 1000,
-          },
-        },
-      });
-    }
-  }
+  // Random inter-user transactions with categories
+  const categories = [
+    "Food",
+    "Shopping",
+    "Entertainment",
+    "Travel",
+    "Utilities",
+  ];
 
-  // Inter-user transactions
   for (let i = 0; i < users.length; i++) {
     if (!users[i].accounts || !users[i].accounts.length) continue;
-    const nextIndex = (i + 1) % users.length;
-    if (!users[nextIndex].accounts || !users[nextIndex].accounts.length) continue;
-    
+
+    // Only 60% chance of transaction occurring
+    if (Math.random() > 0.6) continue;
+
+    const randomUserIndex = Math.floor(Math.random() * users.length);
+    if (i === randomUserIndex) continue;
+
+    if (
+      !users[randomUserIndex].accounts ||
+      !users[randomUserIndex].accounts.length
+    )
+      continue;
+
     const fromAccount = users[i].accounts[0];
-    const toAccount = users[nextIndex].accounts[0];
-    await processTransaction(fromAccount.id, toAccount.id, 1000);
+    const toAccount = users[randomUserIndex].accounts[0];
+
+    const randomAmount = Math.floor(Math.random() * (2000 - 100) + 100);
+    const category = categories[Math.floor(Math.random() * categories.length)];
+
+    try {
+      await processTransaction(
+        fromAccount.id,
+        toAccount.id,
+        randomAmount,
+        category
+      );
+    } catch (error) {
+      continue; // Skip failed transactions
+    }
   }
 
-  res.status(HttpStatus.OK).json(resp.success("Simulation successful"));
+  // Gradual balance adjustments based on employment type
+  for (const user of users) {
+    if (!user.accounts || user.accounts.length === 0) continue;
+    const account = user.accounts[0];
+
+    const adjustmentAmount = Math.floor(Math.random() * (1000 - 100) + 100);
+    const isIncrease = Math.random() > 0.5;
+
+    if (user.employmentType === "BUSINESS" && account.balance > 5000) {
+      await prisma.bankAccount.update({
+        where: { id: account.id },
+        data: {
+          balance: {
+            [isIncrease ? "increment" : "decrement"]: adjustmentAmount * 1.5,
+          },
+        },
+      });
+    } else if (user.employmentType === "EMPLOYED" && account.balance > 2000) {
+      await prisma.bankAccount.update({
+        where: { id: account.id },
+        data: {
+          balance: {
+            [isIncrease ? "increment" : "decrement"]: adjustmentAmount,
+          },
+        },
+      });
+    }
+  }
+
+  res
+    .status(HttpStatus.OK)
+    .json(resp.success("Realistic simulation completed"));
 });
 
 const processTransaction = async (
   fromAccountId: string,
   toAccountId: string,
-  amount: number
+  amount: number,
+  category: string
 ) => {
   const fromAccount = await prisma.bankAccount.findUnique({
     where: {
@@ -249,6 +283,7 @@ const processTransaction = async (
       amount,
       mode: "UPI",
       status: "SUCCESS",
+      description: category,
     },
   });
 
@@ -292,56 +327,55 @@ export const revenueGen = asyncHandler(async (req: Request, res: Response) => {
   for (const user of users) {
     if (!user.accounts || user.accounts.length === 0) continue;
     const account = user.accounts[0];
-    
-    if (account.balance < user.businessIncome! / 30) {
-      await prisma.bankAccount.update({
-        where: {
-          id: account.id,
-        },
-        data: {
-          balance: {
-            increment: user.businessIncome! / 30,
-          },
-        },
-      });
-    }
-  }
-
-  res.status(HttpStatus.OK).json(resp.success("Revenue generation successful"));
-});
-
-export const simulateMonthlyExpenses = asyncHandler(async (req: Request, res: Response) => {
-  const users = await prisma.user.findMany({
-    include: { accounts: true },
-  });
-
-  for (const user of users) {
-    if (!user.accounts.length) continue;
-    const account = user.accounts[0];
-    
-    // Simulate random monthly expenses between 20% to 40% of account balance
-    const expensePercentage = Math.random() * (0.4 - 0.2) + 0.2;
-    const expenseAmount = account.balance * expensePercentage;
-
-    if (account.balance >= expenseAmount) {
+    const dailyIncome = Number(user.income) / (30 * 365);
+    console.log(user.name, dailyIncome);
+    if (dailyIncome > 0 && account.balance < dailyIncome) {
       await prisma.bankAccount.update({
         where: { id: account.id },
-        data: {
-          balance: { decrement: expenseAmount },
-        },
-      });
-
-      await prisma.transaction.create({
-        data: {
-          fromAccountId: account.id,
-          amount: expenseAmount,
-          mode: "POS",
-          description: "Monthly Expenses",
-          status: "SUCCESS",
-        },
+        data: { balance: { increment: dailyIncome } },
       });
     }
   }
 
-  res.status(HttpStatus.OK).json(resp.success("Monthly expenses simulation completed"));
+  res.status(HttpStatus.OK).json(resp.success("Revenue generation successful!!"));
 });
+
+export const simulateMonthlyExpenses = asyncHandler(
+  async (req: Request, res: Response) => {
+    const users = await prisma.user.findMany({
+      include: { accounts: true },
+    });
+
+    for (const user of users) {
+      if (!user.accounts.length) continue;
+      const account = user.accounts[0];
+
+      const expensePercentage = Math.random() * (0.4 - 0.2) + 0.2;
+      const expenseAmount =
+        Math.floor(account.balance * expensePercentage * 100) / 100; // Round to 2 decimal places
+
+      if (account.balance >= expenseAmount && expenseAmount > 0) {
+        await prisma.bankAccount.update({
+          where: { id: account.id },
+          data: {
+            balance: { decrement: expenseAmount },
+          },
+        });
+
+        await prisma.transaction.create({
+          data: {
+            fromAccountId: account.id,
+            amount: expenseAmount,
+            mode: "POS",
+            description: "Monthly Expenses",
+            status: "SUCCESS",
+          },
+        });
+      }
+    }
+
+    res
+      .status(HttpStatus.OK)
+      .json(resp.success("Monthly expenses simulation completed"));
+  }
+);

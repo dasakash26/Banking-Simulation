@@ -2,7 +2,7 @@
 CREATE TYPE "EmploymentType" AS ENUM ('EMPLOYED', 'BUSINESS');
 
 -- CreateEnum
-CREATE TYPE "AccountType" AS ENUM ('SAVINGS', 'CURRENT', 'SALARY');
+CREATE TYPE "AccountType" AS ENUM ('SAVINGS', 'CURRENT', 'income');
 
 -- CreateEnum
 CREATE TYPE "LoanType" AS ENUM ('HOME', 'PERSONAL', 'EDUCATION', 'VEHICLE');
@@ -29,7 +29,7 @@ CREATE TABLE "User" (
     "dob" TIMESTAMP(3) NOT NULL,
     "address" TEXT,
     "employmentType" "EmploymentType" NOT NULL,
-    "salary" DOUBLE PRECISION,
+    "income" DOUBLE PRECISION,
     "businessIncome" DOUBLE PRECISION,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
