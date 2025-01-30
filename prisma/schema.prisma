@@ -1,0 +1,162 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String          @id @default(cuid())
+  pan            String          @unique
+  name           String
+  mobile         String?          @unique
+  email          String?
+  dob            DateTime?
+  address        String?
+  employmentType EmploymentType
+  salary         Float?
+  businessIncome Float?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  accounts       BankAccount[]
+  investments    Investment[]
+  loans          Loan[]
+  isActive       Boolean         @default(true)
+  kycComplete    Boolean         @default(false)
+
+  @@index([pan])
+}
+
+enum EmploymentType {
+  EMPLOYED
+  BUSINESS
+}
+
+model BankAccount {
+  id            String        @id @default(uuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id])
+  accountNumber String        @unique
+  type          AccountType
+  ifscCode      String
+  branch        Branch       @relation(fields: [branchCode], references: [code])
+  branchCode    String
+  balance       Float         @default(0)
+  balanceUpdatedAt DateTime   @default(now())
+  nomineeName   String?
+  nomineeRelation String?
+  createdAt     DateTime      @default(now())
+  creditTransactions  Transaction[] @relation("CreditAccount")
+  debitTransactions   Transaction[] @relation("DebitAccount")
+  loans         Loan[]
+  isActive      Boolean       @default(true)
+
+  @@index([userId])
+  @@index([branchCode])
+}
+
+model Branch {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  name      String?
+  address   String?
+  city      String?
+  state     String?
+  ifscCode  String   @unique
+  accounts  BankAccount[]
+}
+
+enum AccountType {
+  SAVINGS
+  CURRENT
+  SALARY
+}
+
+model Loan {
+  id             String     @id @default(uuid())
+  accountId      String
+  account        BankAccount @relation(fields: [accountId], references: [id])
+  userId        String
+  user          User        @relation(fields: [userId], references: [id])
+  type           LoanType
+  amount         Float
+  emi            Float
+  startDate      DateTime
+  tenureMonths   Int
+  remainingAmount Float
+  interestRate   Float
+  purpose        String
+  collateral     String?
+  isActive       Boolean    @default(true)
+  createdAt      DateTime   @default(now())
+
+  @@index([accountId])
+}
+
+enum LoanType {
+  HOME
+  PERSONAL
+  EDUCATION
+  VEHICLE
+}
+
+model Investment {
+  id           String        @id @default(uuid())
+  userId       String
+  user         User         @relation(fields: [userId], references: [id])
+  type         InvestmentType
+  amount       Float
+  currentValue Float
+  interestRate Float?
+  maturityDate DateTime?
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+enum InvestmentType {
+  FD
+  RD
+  PPF
+  MUTUAL_FUNDS
+  STOCKS
+}
+
+model Transaction {
+  id             String           @id @default(uuid())
+  fromAccountId  String?
+  fromAccount    BankAccount?    @relation("DebitAccount", fields: [fromAccountId], references: [id])
+  toAccountId    String?
+  toAccount      BankAccount?    @relation("CreditAccount", fields: [toAccountId], references: [id])
+  amount         Float           
+  mode           TransactionMode
+  description    String?
+  reference      String?        
+  status         TransactionStatus @default(PENDING)
+  createdAt      DateTime       @default(now())
+
+  @@index([fromAccountId])
+  @@index([toAccountId])
+}
+
+
+
+enum TransactionMode {
+  CASH
+  UPI
+  NEFT
+  IMPS
+  CHEQUE
+  ATM
+  POS
+  INTERNET_BANKING
+  
+}
+
+enum TransactionStatus {
+  SUCCESS
+  FAILED
+  PENDING
+}
