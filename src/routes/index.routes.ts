@@ -8,8 +8,8 @@ const router = Router();
 
 // User routes
 router.post("/user", createUser);
-router.get("/user/:pan", getUserByPAN);
 router.get("/user/all", getAllUsers); 
+router.get("/user/:pan", getUserByPAN);
 
 // Account routes
 router.post("/account", createAccount);
