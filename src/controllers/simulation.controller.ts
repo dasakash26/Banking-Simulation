@@ -327,8 +327,8 @@ export const revenueGen = asyncHandler(async (req: Request, res: Response) => {
   for (const user of users) {
     if (!user.accounts || user.accounts.length === 0) continue;
     const account = user.accounts[0];
-    const dailyIncome = Number(user.income) / (30 * 365);
-    if (dailyIncome > 0 && account.balance < dailyIncome) {
+    const dailyIncome = Number(user.income);
+    if (dailyIncome > 0) {
       await prisma.bankAccount.update({
         where: { id: account.id },
         data: { balance: { increment: dailyIncome } },
@@ -336,7 +336,9 @@ export const revenueGen = asyncHandler(async (req: Request, res: Response) => {
     }
   }
 
-  res.status(HttpStatus.OK).json(resp.success("Revenue generation successful!!"));
+  res
+    .status(HttpStatus.OK)
+    .json(resp.success("Revenue generation successful!!"));
 });
 
 export const simulateMonthlyExpenses = asyncHandler(
@@ -351,7 +353,7 @@ export const simulateMonthlyExpenses = asyncHandler(
 
       const expensePercentage = Math.random() * (0.4 - 0.2) + 0.2;
       const expenseAmount =
-        Math.floor(account.balance * expensePercentage * 100) / 100; // Round to 2 decimal places
+        Math.floor(account.balance * expensePercentage * 100) / 100; 
 
       if (account.balance >= expenseAmount && expenseAmount > 0) {
         await prisma.bankAccount.update({
