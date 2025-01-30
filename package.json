@@ -2,12 +2,12 @@
   "name": "dummy-bank",
   "version": "1.0.0",
   "main": "index.js",
-  "type": "module",
+  "type": "commonjs",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node dist/index.js",
+    "start": "node dist/src/index.js",
     "dev": "tsx watch src",
-    "build": "tsc --target esnext --outDir dist"
+    "build": "tsc"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
