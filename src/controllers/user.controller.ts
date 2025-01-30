@@ -14,7 +14,6 @@ interface User {
   address: string | null;
   employmentType: "EMPLOYED" | "BUSINESS";
   income: number | null;
-  businessIncome: number | null;
 }
 
 interface Account {
@@ -73,33 +72,36 @@ export const getUserByPAN = asyncHandler(
 );
 
 export const createUser = asyncHandler(async (req: Request, res: Response) => {
-  const validatedData = createUserSchema.parse(req.body);
-  const existingUser = await prisma.user.findFirst({
-    where: {
-      OR: [
-        { pan: validatedData.pan },
-        { mobile: validatedData.mobile },
-        ...(validatedData.email ? [{ email: validatedData.email }] : []),
-      ],
-    },
-  });
+  const {
+    name,
+    email,
+    mobile,
+    pan,
+    dob,
+    employmentType,
+    income, // Use single income field instead of businessIncome
+    kycComplete,
+  } = req.body;
 
-  if (existingUser) {
-    throw new ApiError(
-      HttpStatus.CONFLICT,
-      "User with same PAN, mobile, or email already exists"
-    );
+  // Validate required fields
+  if (!name || !email || !mobile || !pan || !dob || !employmentType) {
+    throw new ApiError(HttpStatus.BAD_REQUEST, "Missing required fields");
   }
 
-  const user = await prisma.user.create({
+  const newUser = await prisma.user.create({
     data: {
-      ...validatedData,
-      income: validatedData.income || null,
-      businessIncome: validatedData.businessIncome || null,
+      name,
+      email,
+      mobile,
+      pan,
+      dob: new Date(dob),
+      employmentType,
+      income: income || 0, // Default to 0 if not provided
+      kycComplete: kycComplete || false,
     },
   });
 
-  res.status(HttpStatus.CREATED).json(resp.success(user));
+  res.status(HttpStatus.CREATED).json(resp.success(newUser, "User created"));
 });
 
 function calculateNetWorth(user: UserWithFinancials): number {
