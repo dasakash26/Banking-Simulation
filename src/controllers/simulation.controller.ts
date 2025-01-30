@@ -66,37 +66,33 @@ export const earn = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const salaryCycle = asyncHandler(async (req: Request, res: Response) => {
-  //get the user accounts
-    const users = await prisma.user.findMany({
-        include: {
-        accounts: true,
+  const users = await prisma.user.findMany({
+    include: {
+      accounts: true,
+    },
+  });
+
+  if (!users || users.length === 0) {
+    throw new ApiError(HttpStatus.NOT_FOUND, "Users not found");
+  }
+
+  for (const user of users) {
+    if (!user.accounts || user.accounts.length === 0) continue;
+    const account = user.accounts[0];
+    
+    await prisma.bankAccount.update({
+      where: {
+        id: account.id,
+      },
+      data: {
+        balance: {
+          increment: user.employmentType === "EMPLOYED" ? user.salary! : 0,
         },
+      },
     });
+  }
 
-    if (!users) {
-        throw new ApiError(HttpStatus.NOT_FOUND, "Users not found");
-    }
-
-    //simulate transactions for each user
-    users.forEach(async (user) => {
-        const account = user.accounts[0];
-      
-        await prisma.bankAccount.update({
-            where: {
-            id: account.id,
-            },
-            data: {
-            balance: {
-                increment: 
-                user.employmentType === "EMPLOYED" ? user.salary! : 0,
-            },
-            },
-        });
-
-
-    });
-
-    res.status(HttpStatus.OK).json(resp.success("Salary cycle successful"));
+  res.status(HttpStatus.OK).json(resp.success("Salary cycle successful"));
 });
 
 //repay loan emi
@@ -159,20 +155,21 @@ export const loanEMI = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const simulate = asyncHandler(async (req: Request, res: Response) => {
-  //get the user accounts
   const users = await prisma.user.findMany({
     include: {
       accounts: true,
     },
   });
 
-  if (!users) {
+  if (!users || users.length === 0) {
     throw new ApiError(HttpStatus.NOT_FOUND, "Users not found");
   }
 
-  //simulate transactions for each user
-  users.forEach(async (user) => {
+  // First simulation phase
+  for (const user of users) {
+    if (!user.accounts || user.accounts.length === 0) continue;
     const account = user.accounts[0];
+    
     if (account.balance < 1000) {
       await prisma.bankAccount.update({
         where: {
@@ -185,11 +182,13 @@ export const simulate = asyncHandler(async (req: Request, res: Response) => {
         },
       });
     }
-  });
+  }
 
-  //simulate transactions for each user
-  users.forEach(async (user) => {
+  // Second simulation phase
+  for (const user of users) {
+    if (!user.accounts || user.accounts.length === 0) continue;
     const account = user.accounts[0];
+    
     if (account.balance > 10000) {
       await prisma.bankAccount.update({
         where: {
@@ -202,12 +201,16 @@ export const simulate = asyncHandler(async (req: Request, res: Response) => {
         },
       });
     }
-  });
+  }
 
-  //simulate transactions between users
+  // Inter-user transactions
   for (let i = 0; i < users.length; i++) {
+    if (!users[i].accounts || !users[i].accounts.length) continue;
+    const nextIndex = (i + 1) % users.length;
+    if (!users[nextIndex].accounts || !users[nextIndex].accounts.length) continue;
+    
     const fromAccount = users[i].accounts[0];
-    const toAccount = users[(i + 1) % users.length].accounts[0];
+    const toAccount = users[nextIndex].accounts[0];
     await processTransaction(fromAccount.id, toAccount.id, 1000);
   }
 
@@ -273,38 +276,38 @@ const processTransaction = async (
 };
 
 export const revenueGen = asyncHandler(async (req: Request, res: Response) => {
-    //check the business income of each user
-    const users = await prisma.user.findMany({
-      where: {
-        employmentType: "BUSINESS",
-      },
-      include: {
-        accounts: true,
-      },
-    });
+  const users = await prisma.user.findMany({
+    where: {
+      employmentType: "BUSINESS",
+    },
+    include: {
+      accounts: true,
+    },
+  });
 
-    if (!users) {
-      throw new ApiError(HttpStatus.NOT_FOUND, "Business users not found");
+  if (!users || users.length === 0) {
+    throw new ApiError(HttpStatus.NOT_FOUND, "Business users not found");
+  }
+
+  for (const user of users) {
+    if (!user.accounts || user.accounts.length === 0) continue;
+    const account = user.accounts[0];
+    
+    if (account.balance < user.businessIncome! / 30) {
+      await prisma.bankAccount.update({
+        where: {
+          id: account.id,
+        },
+        data: {
+          balance: {
+            increment: user.businessIncome! / 30,
+          },
+        },
+      });
     }
+  }
 
-    //simulate transactions for each business user income/30
-    users.forEach(async (user) => {
-      const account = user.accounts[0];
-      if (account.balance < user.businessIncome! / 30) {
-        await prisma.bankAccount.update({
-          where: {
-            id: account.id,
-          },
-          data: {
-            balance: {
-              increment: user.businessIncome! / 30,
-            },
-          },
-        });
-      }
-    });
-
-    res.status(HttpStatus.OK).json(resp.success("Revenue generation successful"));
+  res.status(HttpStatus.OK).json(resp.success("Revenue generation successful"));
 });
 
 export const simulateMonthlyExpenses = asyncHandler(async (req: Request, res: Response) => {
