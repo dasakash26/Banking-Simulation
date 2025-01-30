@@ -328,7 +328,6 @@ export const revenueGen = asyncHandler(async (req: Request, res: Response) => {
     if (!user.accounts || user.accounts.length === 0) continue;
     const account = user.accounts[0];
     const dailyIncome = Number(user.income) / (30 * 365);
-    console.log(user.name, dailyIncome);
     if (dailyIncome > 0 && account.balance < dailyIncome) {
       await prisma.bankAccount.update({
         where: { id: account.id },

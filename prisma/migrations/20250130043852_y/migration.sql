@@ -6,7 +6,7 @@
 */
 -- AlterEnum
 BEGIN;
-CREATE TYPE "AccountType_new" AS ENUM ('SAVINGS', 'CURRENT', 'SALARY', 'DEMAT', 'NRI', 'PPF', 'FD', 'RD', 'LOAN');
+CREATE TYPE "AccountType_new" AS ENUM ('SAVINGS', 'CURRENT', 'income', 'DEMAT', 'NRI', 'PPF', 'FD', 'RD', 'LOAN');
 ALTER TABLE "BankAccount" ALTER COLUMN "type" TYPE "AccountType_new" USING ("type"::text::"AccountType_new");
 ALTER TYPE "AccountType" RENAME TO "AccountType_old";
 ALTER TYPE "AccountType_new" RENAME TO "AccountType";
