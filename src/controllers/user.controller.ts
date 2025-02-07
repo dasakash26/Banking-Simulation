@@ -3,7 +3,6 @@ import asyncHandler from "express-async-handler";
 import prisma from "../lib/prisma";
 import { ApiError, HttpStatus } from "../utils/apiError";
 import resp from "../utils/apiRes";
-import { createUserSchema } from "../validators/user.validator";
 
 interface User {
   name: string;
@@ -72,20 +71,23 @@ export const getUserByPAN = asyncHandler(
 );
 
 export const createUser = asyncHandler(async (req: Request, res: Response) => {
-  const {
-    name,
-    email,
-    mobile,
-    pan,
-    dob,
-    employmentType,
-    income, // Use single income field instead of businessIncome
-    kycComplete,
-  } = req.body;
+  const { name, email, mobile, pan, dob, employmentType, income, kycComplete } =
+    req.body;
 
-  // Validate required fields
-  if (!name || !email || !mobile || !pan || !dob || !employmentType) {
-    throw new ApiError(HttpStatus.BAD_REQUEST, "Missing required fields");
+  if (!name || !email || !pan || !employmentType || !income) {
+    throw ApiError.badRequest(
+      "Name, Email, PAN, employment type, income, are required."
+    );
+  }
+
+  const validEmploymentTypes = ["EMPLOYED", "BUSINESS", "UNEMPLOYED"];
+
+  const existingUser = await prisma.user.findUnique({
+    where: { pan: pan },
+  });
+
+  if (existingUser) {
+    throw ApiError.conflict("User with this PAN already exists");
   }
 
   const newUser = await prisma.user.create({
@@ -93,10 +95,10 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
       name,
       email,
       mobile,
-      pan,
-      dob: new Date(dob),
+      pan: pan,
+      dob: dob || null,
       employmentType,
-      income: income || 0, // Default to 0 if not provided
+      income,
       kycComplete: kycComplete || false,
     },
   });
@@ -105,6 +107,10 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
 });
 
 function calculateNetWorth(user: UserWithFinancials): number {
+  if (!user || !user.accounts || !user.investments || !user.loans) {
+    return 0;
+  }
+
   const assets =
     user.accounts.reduce((sum: number, acc: Account) => sum + acc.balance, 0) +
     user.investments.reduce(

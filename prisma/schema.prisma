@@ -7,7 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {  
+model User {
   id             String         @id @default(cuid())
   pan            String         @unique
   name           String
@@ -37,11 +37,11 @@ enum EmploymentType {
 model BankAccount {
   id                 String        @id @default(uuid())
   userId             String
-  user               User          @relation(fields: [userId], references: [id])
+  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   accountNumber      String        @unique
   type               AccountType
   ifscCode           String
-  branch             Branch        @relation(fields: [branchCode], references: [code])
+  branch             Branch        @relation(fields: [branchCode], references: [code], onDelete: Cascade)
   branchCode         String
   balance            Float         @default(0)
   balanceUpdatedAt   DateTime      @default(now())
@@ -83,9 +83,9 @@ enum AccountType {
 model Loan {
   id              String      @id @default(uuid())
   accountId       String
-  account         BankAccount @relation(fields: [accountId], references: [id])
+  account         BankAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
   userId          String
-  user            User        @relation(fields: [userId], references: [id])
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   type            LoanType
   amount          Float
   emi             Float
@@ -111,7 +111,7 @@ enum LoanType {
 model Investment {
   id           String         @id @default(uuid())
   userId       String
-  user         User           @relation(fields: [userId], references: [id])
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   type         InvestmentType
   amount       Float
   currentValue Float
@@ -133,9 +133,9 @@ enum InvestmentType {
 model Transaction {
   id            String            @id @default(uuid())
   fromAccountId String?
-  fromAccount   BankAccount?      @relation("DebitAccount", fields: [fromAccountId], references: [id])
+  fromAccount   BankAccount?      @relation("DebitAccount", fields: [fromAccountId], references: [id], onDelete: Cascade)
   toAccountId   String?
-  toAccount     BankAccount?      @relation("CreditAccount", fields: [toAccountId], references: [id])
+  toAccount     BankAccount?      @relation("CreditAccount", fields: [toAccountId], references: [id], onDelete: Cascade)
   amount        Float
   mode          TransactionMode
   description   String?

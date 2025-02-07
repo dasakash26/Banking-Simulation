@@ -2,20 +2,23 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const validateEnv = (): { PORT: string; DATABASE_URL: string } => {
-  const requiredVars = [
-    "PORT",
-    "DATABASE_URL",
-  ] as const;
+interface EnvVars {
+  PORT: string;
+  DATABASE_URL: string;
+  JWT_SECRET: string;
+}
+
+const validateEnv = (): EnvVars => {
+  const requiredVars = ["PORT", "DATABASE_URL", "JWT_SECRET"] as const;
 
   type EnvVars = {
-    [K in typeof requiredVars[number]]: string;
+    [K in (typeof requiredVars)[number]]: string;
   };
 
   const envVars = {} as EnvVars;
   const missing: string[] = [];
   console.log("> Loading environment variables... from .env file");
-  
+
   for (const key of requiredVars) {
     const value = process.env[key];
     if (!value) {
@@ -36,4 +39,4 @@ const validateEnv = (): { PORT: string; DATABASE_URL: string } => {
   return envVars;
 };
 
-export const { PORT, DATABASE_URL } = validateEnv();
+export const { PORT, DATABASE_URL, JWT_SECRET } = validateEnv();
